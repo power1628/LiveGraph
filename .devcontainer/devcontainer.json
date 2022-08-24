@@ -5,6 +5,7 @@
     "twxs.cmake",
     "ms-vscode.cmake-tools",
     "vadimcn.vscode-lldb",
+    "ms-vscode.cpptools",
   ],
   "mounts": [
     "source=${localEnv:HOME},target=/root,type=bind,consistency=cached"

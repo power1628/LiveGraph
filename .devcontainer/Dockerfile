@@ -10,6 +10,7 @@ RUN apt-get install -y libboost-all-dev
 RUN apt install -y clang
 RUN apt install -y libtbb-dev
 RUN apt install -y libgoogle-glog-dev libgflags-dev
+RUN apt install -y pkg-config
 
 
 #RUN	add-apt-repository -y ppa:ubuntu-toolchain-r/test &&\

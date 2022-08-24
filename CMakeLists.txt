@@ -66,3 +66,5 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
     include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
     doctest_discover_tests(tests)
 endif()
+
+add_subdirectory(bench)
