@@ -4,6 +4,7 @@
     "cheshirekow.cmake-format",
     "twxs.cmake",
     "ms-vscode.cmake-tools",
+    "vadimcn.vscode-lldb",
   ],
   "mounts": [
     "source=${localEnv:HOME},target=/root,type=bind,consistency=cached"
