@@ -1,14 +1,17 @@
 {
   "name": "livegraph",
   "extensions": [
+    "cheshirekow.cmake-format",
+    "twxs.cmake",
+    "ms-vscode.cmake-tools",
   ],
   "mounts": [
-    "source=${localEnv:HOME},target=/home/builder,type=bind,consistency=cached"
+    "source=${localEnv:HOME},target=/root,type=bind,consistency=cached"
   ],
   "dockerFile": "Dockerfile",
-  "remoteUser": "builder",
+  "remoteUser": "root",
   "updateRemoteUserUID": true,
-  "postCreateCommand": "sudo chown -R builder /opt/rust",
+  //  "postCreateCommand": "sudo chown -R builder /opt/rust",
   "settings": {
     "editor.formatOnSave": true,
     "files.exclude": {

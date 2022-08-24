@@ -9,6 +9,10 @@ RUN apt install -y net-tools vim git && \
 RUN apt-get install -y libboost-all-dev
 RUN apt install -y clang
 RUN apt install -y libtbb-dev
+RUN apt install -y libgoogle-glog-dev libgflags-dev
+
 
 #RUN	add-apt-repository -y ppa:ubuntu-toolchain-r/test &&\
 #		apt install -y gcc-11 g++-11
+
+#USER builder
