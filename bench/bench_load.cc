@@ -256,6 +256,12 @@ void load_graph(const std::string &data_path, int num_load_task, vertex_t num_v,
 
 int main(int argc, char **argv)
 {
+    std::string usage;
+    usage.append("\n")
+        .append("   -csv <csv_path> path to csv files")
+        .append("   -num_v <max_vid> vertex maximum id")
+        .append("   -num_load_task <n> number of load task");
+    gflags::SetUsageMessage(usage);
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
 
