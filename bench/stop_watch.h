@@ -6,19 +6,19 @@ public:
     float elapsed_sec()
     {
         auto end = std::chrono::system_clock::now();
-        return std::chrono::duration_cast<std::chrono::seconds>(end - start_).count();
+        return static_cast<float>(std::chrono::duration_cast<std::chrono::seconds>(end - start_).count());
     }
 
     float elapsed_milli_sec()
     {
         auto end = std::chrono::system_clock::now();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(end - start_).count();
+        return static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start_).count());
     }
 
     float elapsed_micro_sec()
     {
         auto end = std::chrono::system_clock::now();
-        return std::chrono::duration_cast<std::chrono::microseconds>(end - start_).count();
+        return static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(end - start_).count());
     }
 
     void reset() { start_ = std::chrono::system_clock::now(); }
@@ -27,7 +27,7 @@ public:
     {
 
         auto end = std::chrono::system_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start_).count();
+        auto elapsed = static_cast<float>(std::chrono::duration_cast<std::chrono::seconds>(end - start_).count());
         records_.push_back(elapsed);
     }
 
@@ -35,7 +35,7 @@ public:
     {
 
         auto end = std::chrono::system_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start_).count();
+        auto elapsed = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(end - start_).count());
         records_.push_back(elapsed);
     }
 
@@ -43,7 +43,7 @@ public:
     {
 
         auto end = std::chrono::system_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_).count();
+        auto elapsed = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start_).count());
         records_.push_back(elapsed);
     }
 

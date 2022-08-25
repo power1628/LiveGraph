@@ -10,6 +10,7 @@
 #include "bind/livegraph.hpp"
 #include "core/livegraph.hpp"
 
+#include "./stacktrace.h"
 #include "./stop_watch.h"
 #include <filesystem>
 #include <fstream>
@@ -176,22 +177,25 @@ void load_graph(const std::string &data_path, int num_load_task, vertex_t num_v,
         StopWatch watch;
         std::thread tasks[num_load_task];
 
-        auto txn = graph->begin_batch_loader();
         vertex_t num_avg = (num_v + num_load_task - 1) / num_load_task;
+        auto txn = graph->begin_batch_loader();
+
         for (int i = 0; i < num_load_task; ++i)
         {
             vertex_t begin = num_avg * (i);
             vertex_t end = std::min((num_avg) * (i + 1), num_v + 1);
             tasks[i] = std::thread(
-                [&](int task_id)
+                [&](int task_id, vertex_t begin, vertex_t end)
                 {
+                    LOG(INFO) << "[" << begin << ", " << end << ")";
                     for (vertex_t vid = begin; vid < end; ++vid)
                     {
                         vertex_t id = txn.new_vertex();
-                        txn.put_vertex(id, "");
+                        std::string data = "";
+                        txn.put_vertex(id, data);
                     }
                 },
-                i);
+                i, begin, end);
         }
 
         for (int i = 0; i < num_load_task; ++i)
@@ -232,7 +236,8 @@ void load_graph(const std::string &data_path, int num_load_task, vertex_t num_v,
                         {
                             vertex_t from, to;
                             std::tie(from, to) = item;
-                            txn.put_edge(from, label, to, "");
+                            std::string data = "";
+                            txn.put_edge(from, label, to, data);
                             num_edges.fetch_add(1);
                         }
                     }
@@ -256,27 +261,33 @@ void load_graph(const std::string &data_path, int num_load_task, vertex_t num_v,
 
 int main(int argc, char **argv)
 {
-    std::string usage;
-    usage.append("\n")
-        .append("   -csv <csv_path> path to csv files")
-        .append("   -num_v <max_vid> vertex maximum id")
-        .append("   -num_load_task <n> number of load task");
-    gflags::SetUsageMessage(usage);
+    SetupStacktraceSignal();
+    FLAGS_logtostderr = 1;
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+    gflags::ShowUsageWithFlagsRestrict(argv[0], "bench_load");
 
     // create graph
     std::string db_path = "./db_block";
     std::string wal_path = "./db_wal";
-    size_t max_block_size = 128 * 1024 * 1024; // 128 MB
     label_t label = 1;
     std::string csv = FLAGS_csv;
     int num_load_task = FLAGS_num_load_task;
     vertex_t num_v = static_cast<vertex_t>(FLAGS_num_v);
 
-    Graph *g = new Graph(db_path, wal_path, max_block_size);
-    StopWatch watch;
-    load_graph(csv, num_load_task, num_v, label, g);
-    LOG(INFO) << "load_graph cost(sec) : " << watch.elapsed_sec();
+    Graph *g = new Graph(db_path, wal_path);
+    {
+        StopWatch watch;
+        load_graph(csv, num_load_task, num_v, label, g);
+        LOG(INFO) << "load_graph cost(sec) : " << watch.elapsed_sec();
+    }
+    // compact
+    {
+        StopWatch watch;
+        g->compact();
+        LOG(INFO) << "compact cost(sec) : " << watch.elapsed_sec();
+    }
+
     return 0;
 }
