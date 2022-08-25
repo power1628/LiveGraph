@@ -10,6 +10,7 @@
 #include "bind/livegraph.hpp"
 #include "core/livegraph.hpp"
 
+#include "./stop_watch.h"
 #include <filesystem>
 #include <fstream>
 #include <gflags/gflags.h>
@@ -19,6 +20,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 DEFINE_string(csv, "", "path to graph to load");
@@ -63,9 +65,44 @@ class CsvFileIterator
 {
 public:
     using Item = std::tuple<vertex_t, vertex_t>;
-    CsvFileIterator(ThreadSafeDeque *files) : files_(files) { std::string file = files->pop(); }
+    CsvFileIterator(ThreadSafeDeque *files) : files_(files)
+    {
+        state_ = State();
+        state_.next_file(files_);
+    }
 
-    std::tuple<bool, Item> next() {}
+    std::tuple<bool, Item> next()
+    {
+        if (state_.empty())
+        {
+            LOG(INFO) << "iter done" << std::endl;
+            return std::tuple(false, std::tuple(0, 0));
+        }
+        else
+        {
+            bool has_next;
+            Item item;
+            tie(has_next, item) = state_.next();
+            if (has_next)
+            {
+                return std::tuple(has_next, item);
+            }
+            else
+            {
+                // next_state
+                state_.next_file(files_);
+                if (state_.empty())
+                {
+                    // eof
+                    return std::tuple(false, item);
+                }
+                else
+                {
+                    return state_.next();
+                }
+            }
+        }
+    }
 
 private:
     struct State
@@ -74,18 +111,26 @@ private:
         std::ifstream fstream_;
         std::string file_;
 
-        State(std::string file)
+        State() { empty_ = true; }
+
+        bool next_file(ThreadSafeDeque *files)
         {
-            file_ = file;
-            fstream_ = std::ifstream(file);
+            tie(empty_, file_) = files->pop();
+            if (!empty_)
+            {
+                fstream_ = std::ifstream(file_);
+            }
+            return empty_;
         }
+
+        bool empty() { return empty_; }
 
         std::tuple<bool, Item> next()
         {
             bool has_next = false;
             Item item;
             std::string line;
-            auto res = std::getline(fstream_, line);
+            auto &res = std::getline(fstream_, line);
             if (res.good())
             {
                 has_next = true;
@@ -121,21 +166,111 @@ private:
 
     std::string dir_;
     ThreadSafeDeque *files_;
+    State state_;
 };
 
-void load_graph(const std::string &data_path, int num_load_task, vertex_t num_v, Graph *graph) {}
+void load_graph(const std::string &data_path, int num_load_task, vertex_t num_v, label_t label, Graph *graph)
+{
+    // create vertex
+    {
+        StopWatch watch;
+        std::thread tasks[num_load_task];
+
+        auto txn = graph->begin_batch_loader();
+        vertex_t num_avg = (num_v + num_load_task - 1) / num_load_task;
+        for (int i = 0; i < num_load_task; ++i)
+        {
+            vertex_t begin = num_avg * (i);
+            vertex_t end = std::min((num_avg) * (i + 1), num_v + 1);
+            tasks[i] = std::thread(
+                [&](int task_id)
+                {
+                    for (vertex_t vid = begin; vid < end; ++vid)
+                    {
+                        vertex_t id = txn.new_vertex();
+                        txn.put_vertex(id, "");
+                    }
+                },
+                i);
+        }
+
+        for (int i = 0; i < num_load_task; ++i)
+        {
+            tasks[i].join();
+        }
+        watch.record_sec();
+
+        txn.commit();
+        watch.record_sec();
+        LOG(INFO) << "create vertex : " << num_v << " cost(sec) : " << watch.report();
+    }
+
+    // load edge
+    {
+        StopWatch watch;
+        std::atomic_uint64_t num_edges;
+        ThreadSafeDeque files(data_path);
+        std::thread tasks[num_load_task];
+        auto txn = graph->begin_batch_loader();
+        for (int i = 0; i < num_load_task; ++i)
+        {
+            CsvFileIterator file_iter(&files);
+            tasks[i] = std::thread(
+                [file_iter = std::move(file_iter), &txn, &label, &num_edges](int task_id) mutable
+                {
+                    bool has_next;
+                    CsvFileIterator::Item item;
+                    while (true)
+                    {
+                        std::tie(has_next, item) = file_iter.next();
+                        if (!has_next)
+                        {
+                            LOG(INFO) << "task-" << task_id << " done";
+                            break;
+                        }
+                        else
+                        {
+                            vertex_t from, to;
+                            std::tie(from, to) = item;
+                            txn.put_edge(from, label, to, "");
+                            num_edges.fetch_add(1);
+                        }
+                    }
+                },
+                i);
+        }
+
+        for (int i = 0; i < num_load_task; ++i)
+        {
+            tasks[i].join();
+        }
+
+        watch.record_sec();
+
+        txn.commit();
+        watch.record_sec();
+        LOG(INFO) << "load edge : " << num_edges.load() << " cost(sec) : " << watch.report();
+
+    } // end of load edge
+}
 
 int main(int argc, char **argv)
 {
+    google::InitGoogleLogging(argv[0]);
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
     // create graph
     std::string db_path = "./db_block";
     std::string wal_path = "./db_wal";
     size_t max_block_size = 128 * 1024 * 1024; // 128 MB
+    label_t label = 1;
     std::string csv = FLAGS_csv;
     int num_load_task = FLAGS_num_load_task;
     vertex_t num_v = static_cast<vertex_t>(FLAGS_num_v);
 
     Graph *g = new Graph(db_path, wal_path, max_block_size);
-    load_graph(csv, num_load_task, num_v, g);
+    StopWatch watch;
+    load_graph(csv, num_load_task, num_v, label, g);
+    LOG(INFO) << "load_graph cost(sec) : " << watch.elapsed_sec();
     return 0;
 }

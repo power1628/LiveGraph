@@ -8,4 +8,4 @@ message(STATUS "using glog ${glog_VERSION}")
 message(STATUS "using gflags ${gflags_VERSION}")
 
 add_executable(bench_load bench_load.cc)
-target_link_libraries(bench_load livegraph)
+target_link_libraries(bench_load livegraph glog gflags)
