@@ -289,5 +289,6 @@ int main(int argc, char **argv)
         LOG(INFO) << "compact cost(sec) : " << watch.elapsed_sec();
     }
 
+    delete g;
     return 0;
 }

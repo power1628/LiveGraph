@@ -1,4 +1,5 @@
 #include <chrono>
+#include <sys/time.h>
 class StopWatch
 {
 public:
@@ -65,4 +66,29 @@ public:
 private:
     std::chrono::time_point<std::chrono::system_clock> start_;
     std::vector<float> records_;
+};
+
+class StopWatchLite
+{
+public:
+    StopWatchLite() { reset(); }
+
+    double elapsed_milli_sec()
+    {
+        struct timeval end;
+        assert(gettimeofday(&end, NULL));
+        return double(end.tv_sec - start_.tv_sec) * 1000.0 + double(end.tv_usec - start_.tv_usec) / 1000.0;
+    }
+
+    double elapsed_micro_sec()
+    {
+        struct timeval end;
+        assert(gettimeofday(&end, NULL));
+        return double(end.tv_sec - start_.tv_sec) * 1000000.0 + double(end.tv_usec - start_.tv_usec);
+    }
+
+    void reset() { assert(gettimeofday(&start_, NULL)); }
+
+private:
+    struct timeval start_;
 };
